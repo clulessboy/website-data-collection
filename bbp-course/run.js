@@ -62,8 +62,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const LEAF = '#outline-content li:not(:has(ul))';
   const menuItems = () => page.evaluate((sel) => [...document.querySelectorAll(sel)]
     .map((li, idx) => { const l = li.innerText.trim().split('\n'); return { idx, title: l[0].replace(/ visited$/, ''), visited: l.some(x => / visited$/.test(x)), shown: li.getClientRects().length > 0 }; }), LEAF);
+  // Click a menu row by title (the row itself: its hidden "visited" label overlaps the link text).
   const gotoMenu = async (title) => {
-    await page.locator('#outline-content').getByText(title, { exact: true }).first().click();
+    const item = (await menuItems()).find(i => i.title === title);
+    await page.locator(LEAF).nth(item.idx).click();
     await sleep(dwellMs);
   };
 
@@ -78,7 +80,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   };
 
   if (startAtQuiz) { await gotoMenu('Question time'); }
-  let n = 0, quizIdx = 0, lastKey = '', stuck = 0, sweptMenu = startAtQuiz;
+  // SWEEP_LIMIT=<n> with the quiz shortcut exercises the menu sweep on n slides (testing).
+  const sweepLimit = Number(process.env.SWEEP_LIMIT || Infinity);
+  let n = 0, quizIdx = 0, lastKey = '', stuck = 0, sweptMenu = startAtQuiz && !process.env.SWEEP_LIMIT;
   while (n < 120) {
     n++;
     await sleep(dwellMs);
@@ -93,7 +97,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     if (!sweptMenu && /Quiz and question time/i.test(all)) {
       sweptMenu = true;
       // Items in collapsed sections (the opening slide) are hidden and do not report their visited state.
-      const missed = (await menuItems()).filter(i => i.shown && !i.visited && !/Question time/i.test(i.title));
+      const missed = (await menuItems()).filter(i => i.shown && !i.visited && !/Question time/i.test(i.title)).slice(0, sweepLimit);
       log('unvisited menu slides:', JSON.stringify(missed.map(i => i.title)));
       for (const i of missed) {
         try { await page.locator(LEAF).nth(i.idx).click({ timeout: 10000 }); }
