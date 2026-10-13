@@ -141,7 +141,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     }
 
     const q = ANSWERS.find(([qre]) => qre.test(all));
-    if (q && /Multiple Choice|Submit/i.test(all + ' Submit')) {
+    // A content slide can share a question's wording; only treat it as a quiz slide if the answer choice is there.
+    if (q && s.text.some(t => q[1].test(t))) {
       quizIdx++;
       const choiceText = s.text.find(t => q[1].test(t));
       const picked = await clickAcc(q[1]);
