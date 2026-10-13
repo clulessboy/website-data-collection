@@ -30,7 +30,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   // Visible text of the current slide, read from Storyline's accessibility layer.
   const state = () => page.evaluate(() => {
-    const sel = document.querySelector('.cs-selected .cs-listitem, li.cs-selected, .cs-selected');
+    const sel = document.querySelector('#outline-content .cs-selected');
     const acc = [...document.querySelectorAll('.acc-shadow-el')]
       .map(e => (e.getAttribute('aria-label') || e.innerText || '').trim())
       .filter(t => t && !/\.(png|jpg)$/i.test(t) && !/^(Pause|Replay|Resume|Closed Captioning( Off)?|Previous|Next|Submit)( Button)?$/i.test(t));
@@ -61,7 +61,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   };
   const LEAF = '#outline-content li:not(:has(ul))';
   const menuItems = () => page.evaluate((sel) => [...document.querySelectorAll(sel)]
-    .map((li, idx) => { const l = li.innerText.trim().split('\n'); return { idx, title: l[0].replace(/ visited$/, ''), visited: l.some(x => / visited$/.test(x)) }; }), LEAF);
+    .map((li, idx) => { const l = li.innerText.trim().split('\n'); return { idx, title: l[0].replace(/ visited$/, ''), visited: l.some(x => / visited$/.test(x)), shown: li.getClientRects().length > 0 }; }), LEAF);
   const gotoMenu = async (title) => {
     await page.locator('#outline-content').getByText(title, { exact: true }).first().click();
     await sleep(dwellMs);
@@ -92,10 +92,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     // Before the quiz, visit any menu slides the linear path skipped (scenario branches).
     if (!sweptMenu && /Quiz and question time/i.test(all)) {
       sweptMenu = true;
-      const missed = (await menuItems()).filter(i => !i.visited && !/Question time/i.test(i.title));
+      // Items in collapsed sections (the opening slide) are hidden and do not report their visited state.
+      const missed = (await menuItems()).filter(i => i.shown && !i.visited && !/Question time/i.test(i.title));
       log('unvisited menu slides:', JSON.stringify(missed.map(i => i.title)));
       for (const i of missed) {
-        await page.locator(LEAF).nth(i.idx).click();
+        try { await page.locator(LEAF).nth(i.idx).click({ timeout: 10000 }); }
+        catch (e) { log(`   could not open menu slide "${i.title}": ${e.message.split('\n')[0]}`); continue; }
         await sleep(dwellMs);
         await record(`${tag}-${i.title.replace(/\W+/g, '_')}`);
       }
