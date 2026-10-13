@@ -1,0 +1,11 @@
+{
+  "name": "bbp-course",
+  "private": true,
+  "description": "Headless walkthrough of the WA L&I Bloodborne Pathogens 2021 Storyline course",
+  "scripts": {
+    "run": "node run.js output"
+  },
+  "dependencies": {
+    "playwright": "1.56.1"
+  }
+}
